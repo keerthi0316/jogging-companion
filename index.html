@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Smart Jogging Companion</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 0;
+      background: #f0f0f0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    canvas {
+      border: 1px solid #444;
+      margin-top: 20px;
+      background: #fff;
+    }
+    #stats, #alerts {
+      background: #fff;
+      padding: 15px;
+      margin: 20px;
+      width: 90%;
+      max-width: 600px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+      border-radius: 8px;
+    }
+    #alerts {
+      color: #d9534f;
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+  <h1>🏃 Smart Jogging Companion</h1>
+  <canvas id="mapCanvas" width="600" height="400"></canvas>
+  <div id="stats">
+    <h3>Jog Stats</h3>
+    <p>Distance: <span id="distance">0</span> km</p>
+    <p>Time: <span id="time">0</span> min</p>
+    <p>Speed: <span id="speed">0</span> km/h</p>
+  </div>
+  <div id="alerts"></div>
+
+  <script>
+    const canvas = document.getElementById('mapCanvas');
+    const ctx = canvas.getContext('2d');
+    let positions = [];
+    let watchId;
+    let startTime = Date.now();
+
+    function getCanvasCoords(lat, lon) {
+      const x = (lon + 180) * (canvas.width / 360);
+      const y = (90 - lat) * (canvas.height / 180);
+      return { x, y };
+    }
+
+    function drawPath() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      if (positions.length < 2) return;
+      ctx.beginPath();
+      positions.forEach((pos, i) => {
+        const { x, y } = getCanvasCoords(pos.lat, pos.lon);
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      });
+      ctx.strokeStyle = 'green';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+    }
+
+    function updateStats() {
+      if (positions.length < 2) return;
+      const start = positions[0];
+      const end = positions[positions.length - 1];
+      const distance = getDistance(start.lat, start.lon, end.lat, end.lon);
+      const time = (Date.now() - startTime) / 60000;
+      const speed = distance / (time / 60);
+      document.getElementById('distance').textContent = distance.toFixed(2);
+      document.getElementById('time').textContent = time.toFixed(1);
+      document.getElementById('speed').textContent = speed.toFixed(1);
+    }
+
+    function getDistance(lat1, lon1, lat2, lon2) {
+      const R = 6371;
+      const dLat = (lat2 - lat1) * Math.PI / 180;
+      const dLon = (lon2 - lon1) * Math.PI / 180;
+      const a = Math.sin(dLat / 2) ** 2 +
+                Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                Math.sin(dLon / 2) ** 2;
+      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+      return R * c;
+    }
+
+    if (navigator.geolocation) {
+      watchId = navigator.geolocation.watchPosition((pos) => {
+        const { latitude, longitude } = pos.coords;
+        positions.push({ lat: latitude, lon: longitude });
+        drawPath();
+        updateStats();
+      }, (err) => {
+        document.getElementById('alerts').textContent = 'Error getting location.';
+      }, {
+        enableHighAccuracy: true
+      });
+    } else {
+      document.getElementById('alerts').textContent = 'Geolocation not supported.';
+    }
+
+    if ('connection' in navigator) {
+      const type = navigator.connection.effectiveType;
+      if (['2g', 'slow-2g'].includes(type)) {
+        document.getElementById('alerts').textContent = '⚠️ Poor network detected.';
+      }
+    }
+
+    const statsPanel = document.getElementById('stats');
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (!entry.isIntersecting) {
+          document.getElementById('alerts').textContent = '📉 Stats panel out of view.';
+        } else {
+          document.getElementById('alerts').textContent = '';
+        }
+      });
+    });
+    observer.observe(statsPanel);
+  </script>
+</body>
+</html>
