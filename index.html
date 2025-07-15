@@ -128,6 +128,13 @@
       });
     });
     observer.observe(statsPanel);
+    if ('navigator' in window && 'background' in navigator) {
+      navigator.background.requestSync('jog-session').then(() => {
+        console.log('Jog session sync registered.');
+      }).catch((err) => {
+        console.log('Background sync not supported or failed.', err);
+      });
+    }
   </script>
 </body>
 </html>
